@@ -98,7 +98,12 @@ const resolvers = {
     editNumber: async (root, args) => {
       const person = await Person.findOne({ name: args.name });
       if (!person) {
-        return null;
+        throw new GraphQLError("The name is not in the database", {
+          extensions: {
+            code: "BAD_USER_INPUT",
+            invalidArgs: args.name,
+          },
+        });
       }
       person.phone = args.phone;
       return person.save();
