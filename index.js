@@ -66,11 +66,7 @@ const resolvers = {
       if (!args.phone) {
         return Person.find({});
       }
-      // const byPhone = (person) =>
-      //   args.phone === "YES" ? person.phone : !person.phone;
-      // return persons.filter(byPhone);
-      // filters not applied yet...
-      return Person.find({});
+      return Person.find({ phone: { $exists: args.phone === "YES" } });
     },
     findPerson: async (root, args) => Person.findOne({ name: args.name }),
   },
@@ -93,7 +89,18 @@ const resolvers = {
         });
       }
       const person = new Person({ ...args });
-      return person.save();
+      try {
+        await person.save();
+      } catch (error) {
+        throw new GraphQLError("Saving person failed", {
+          extensions: {
+            code: "BAD_USER_INPUT",
+            invalidArgs: args.name,
+            error,
+          },
+        });
+      }
+      return person;
     },
     editNumber: async (root, args) => {
       const person = await Person.findOne({ name: args.name });
@@ -106,7 +113,20 @@ const resolvers = {
         });
       }
       person.phone = args.phone;
-      return person.save();
+
+      try {
+        await person.save();
+      } catch (error) {
+        throw new GraphQLError("Saving number failed", {
+          extensions: {
+            code: "BAD_USER_INPUT",
+            invalidArgs: args.name,
+            error,
+          },
+        });
+      }
+
+      return person;
     },
   },
 };
