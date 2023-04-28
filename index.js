@@ -20,29 +20,6 @@ mongoose
   .then(() => console.log("Connected to MongoDB"))
   .catch((e) => console.log("error connection to MongoDB: ", e));
 
-let persons = [
-  {
-    name: "Arto Hellas",
-    phone: "040-123543",
-    street: "Tapiolankatu 5 A",
-    city: "Espoo",
-    id: "3d594650-3436-11e9-bc57-8b80ba54c431",
-  },
-  {
-    name: "Matti Luukkainen",
-    phone: "040-432342",
-    street: "Malminkaari 10 A",
-    city: "Helsinki",
-    id: "3d599470-3436-11e9-bc57-8b80ba54c431",
-  },
-  {
-    name: "Venla Ruuska",
-    street: "Nallemäentie 22 C",
-    city: "Helsinki",
-    id: "3d599471-3436-11e9-bc57-8b80ba54c431",
-  },
-];
-
 const typeDefs = `
   type Address {
     street: String!
@@ -84,18 +61,18 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
-    personCount: async () => await Person.collection.countDocuments(),
+    personCount: async () => Person.collection.countDocuments(),
     allPersons: async (root, args) => {
       if (!args.phone) {
-        return await Person.find({});
+        return Person.find({});
       }
       // const byPhone = (person) =>
       //   args.phone === "YES" ? person.phone : !person.phone;
       // return persons.filter(byPhone);
       // filters not applied yet...
-      return await Person.find({});
+      return Person.find({});
     },
-    findPerson: async (root, args) => await Person.findOne({ name: args.name }),
+    findPerson: async (root, args) => Person.findOne({ name: args.name }),
   },
   Person: {
     address: ({ street, city }) => {
@@ -115,8 +92,8 @@ const resolvers = {
           },
         });
       }
-      const person = await new Person({ ...args });
-      return await person.save();
+      const person = new Person({ ...args });
+      return person.save();
     },
     editNumber: async (root, args) => {
       const person = await Person.findOne({ name: args.name });
@@ -124,7 +101,7 @@ const resolvers = {
         return null;
       }
       person.phone = args.phone;
-      return await person.save();
+      return person.save();
     },
   },
 };
