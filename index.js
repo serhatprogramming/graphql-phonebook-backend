@@ -1,13 +1,17 @@
+// Apollo Server
 const { ApolloServer } = require("@apollo/server");
 const { startStandaloneServer } = require("@apollo/server/standalone");
-const { v1: uuid } = require("uuid");
+// GraphQL
 const { GraphQLError } = require("graphql");
+// jwt for tokens and login
+const jwt = require("jsonwebtoken");
 // mongoose db
 const mongoose = require("mongoose");
 // mongoose setup
 mongoose.set("strictQuery", false);
 // model import
 const Person = require("./models/person");
+const User = require("./models/user");
 // dotenv setup
 require("dotenv").config();
 // retrieve mongoDB URI from env file
@@ -138,6 +142,37 @@ const resolvers = {
       }
 
       return person;
+    },
+    createUser: async (root, args) => {
+      const user = new User({ username: args.username });
+
+      return user.save().catch((error) => {
+        throw new GraphQLError("Creating a new user failed!", {
+          extensions: {
+            code: "BAD USER INPUT",
+            invalidArgs: args.name,
+            error,
+          },
+        });
+      });
+    },
+    login: async (root, args) => {
+      const user = await User.findOne({ username: args.username });
+
+      if (!user || args.password !== "secret") {
+        throw new GraphQLError("wrong credentials!", {
+          extensions: {
+            code: "BAD USER INPUT",
+          },
+        });
+      }
+
+      const userToken = {
+        username: user.username,
+        id: user._id,
+      };
+
+      return { value: jwt.sign(userToken, process.env.JWT_SECRET) };
     },
   },
 };
