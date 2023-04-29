@@ -72,7 +72,7 @@ const typeDefs = `
       password: String!
     ): Token
     addAsFriend(
-      username: String!
+      name: String!
     ): User
   }
 `;
