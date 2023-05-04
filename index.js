@@ -12,6 +12,9 @@ mongoose.set("strictQuery", false);
 // model import
 const Person = require("./models/person");
 const User = require("./models/user");
+// types and resolvers import
+const typeDefs = require("./schema");
+const resolvers = require("./resolvers");
 // dotenv setup
 require("dotenv").config();
 // retrieve mongoDB URI from env file
@@ -24,207 +27,12 @@ mongoose
   .then(() => console.log("Connected to MongoDB"))
   .catch((e) => console.log("error connection to MongoDB: ", e));
 
-const typeDefs = `
-  type Person {
-    name: String!
-    phone: String
-    address: Address!
-    id: ID!
-  }
-  type Address {
-    street: String!
-    city: String! 
-  }
-  type User {
-    username: String!
-    friends: [Person!]!
-    id: ID!
-  }
-  type Token {
-    value: String!
-  }
-  enum YesNo {
-    YES
-    NO
-  }
-  type Query {
-    personCount: Int!
-    allPersons(phone: YesNo): [Person!]!
-    findPerson(name: String!): Person
-    me: User
-  }
-  type Mutation {
-    addPerson(
-      name: String!
-      phone: String
-      street: String!
-      city: String!
-    ): Person
-    editNumber(
-      name: String!
-      phone: String!
-    ): Person
-    createUser(
-      username: String!
-    ): User
-    login(
-      username: String!
-      password: String!
-    ): Token
-    addAsFriend(
-      name: String!
-    ): User
-  }
-`;
-
-const resolvers = {
-  Query: {
-    personCount: async () => Person.collection.countDocuments(),
-    allPersons: async (root, args) => {
-      if (!args.phone) {
-        return Person.find({});
-      }
-      return Person.find({ phone: { $exists: args.phone === "YES" } });
-    },
-    findPerson: async (root, args) => Person.findOne({ name: args.name }),
-    me: (root, args, context) => context.currentUser,
-  },
-  Person: {
-    address: ({ street, city }) => {
-      return {
-        street,
-        city,
-      };
-    },
-  },
-  Mutation: {
-    addPerson: async (root, args, context) => {
-      const currentUser = context.currentUser;
-
-      if (!currentUser) {
-        throw new GraphQLError("not authenticated", {
-          extensions: {
-            code: "BAD_USER_INPUT",
-          },
-        });
-      }
-
-      if (await Person.findOne({ name: args.name })) {
-        throw new GraphQLError("Name must be unique", {
-          extensions: {
-            code: "BAD_USER_INPUT",
-            invalidArgs: args.name,
-          },
-        });
-      }
-      const person = new Person({ ...args });
-      try {
-        await person.save();
-        currentUser.friends = currentUser.friends.concat(person);
-        await currentUser.save();
-      } catch (error) {
-        throw new GraphQLError("Saving person failed", {
-          extensions: {
-            code: "BAD_USER_INPUT",
-            invalidArgs: args.name,
-            error,
-          },
-        });
-      }
-      return person;
-    },
-    editNumber: async (root, args) => {
-      const person = await Person.findOne({ name: args.name });
-      if (!person) {
-        throw new GraphQLError("The name is not in the database", {
-          extensions: {
-            code: "BAD_USER_INPUT",
-            invalidArgs: args.name,
-          },
-        });
-      }
-      person.phone = args.phone;
-
-      try {
-        await person.save();
-      } catch (error) {
-        throw new GraphQLError("Saving number failed", {
-          extensions: {
-            code: "BAD_USER_INPUT",
-            invalidArgs: args.name,
-            error,
-          },
-        });
-      }
-
-      return person;
-    },
-    createUser: async (root, args) => {
-      const user = new User({ username: args.username });
-
-      return user.save().catch((error) => {
-        throw new GraphQLError("Creating a new user failed!", {
-          extensions: {
-            code: "BAD USER INPUT",
-            invalidArgs: args.name,
-            error,
-          },
-        });
-      });
-    },
-    login: async (root, args) => {
-      const user = await User.findOne({ username: args.username });
-
-      if (!user || args.password !== "secret") {
-        throw new GraphQLError("wrong credentials!", {
-          extensions: {
-            code: "BAD USER INPUT",
-          },
-        });
-      }
-
-      const userToken = {
-        username: user.username,
-        id: user._id,
-      };
-
-      return { value: jwt.sign(userToken, process.env.JWT_SECRET) };
-    },
-    addAsFriend: async (root, args, { currentUser }) => {
-      const isFriend = (person) =>
-        currentUser.friends
-          .map((f) => f._id.toString())
-          .includes(person._id.toString());
-      if (!currentUser) {
-        throw new GraphQLError("wrong credentials", {
-          extensions: { code: "BAD_USER_INPUT" },
-        });
-      }
-      const person = await Person.findOne({ name: args.name });
-      if (!person) {
-        throw new GraphQLError("The name is not in the database", {
-          extensions: {
-            code: "BAD_USER_INPUT",
-            invalidArgs: args.name,
-          },
-        });
-      }
-      if (!isFriend(person)) {
-        currentUser.friends = currentUser.friends.concat(person);
-      }
-
-      await currentUser.save();
-
-      return currentUser;
-    },
-  },
-};
-
+// Apollo Server
 const server = new ApolloServer({
   typeDefs,
   resolvers,
 });
-
+// start Apollo Server
 startStandaloneServer(server, {
   listen: { port: 4000 },
   context: async ({ req, res }) => {
