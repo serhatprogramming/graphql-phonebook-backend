@@ -1,6 +1,14 @@
 // Apollo Server
 const { ApolloServer } = require("@apollo/server");
 const { startStandaloneServer } = require("@apollo/server/standalone");
+const { expressMiddleware } = require("@apollo/server/express4");
+const {
+  ApolloServerPluginDrainHttpServer,
+} = require("@apollo/server/plugin/drainHttpServer");
+const { makeExecutableSchema } = require("@graphql-tools/schema");
+const express = require("express");
+const cors = require("cors");
+const http = require("http");
 // GraphQL
 const { GraphQLError } = require("graphql");
 // jwt for tokens and login
@@ -27,28 +35,71 @@ mongoose
   .then(() => console.log("Connected to MongoDB"))
   .catch((e) => console.log("error connection to MongoDB: ", e));
 
-// Apollo Server
-const server = new ApolloServer({
-  typeDefs,
-  resolvers,
-});
-// start Apollo Server
-startStandaloneServer(server, {
-  listen: { port: 4000 },
-  context: async ({ req, res }) => {
-    const auth = req ? req.headers.authorization : null;
-    if (auth && auth.startsWith("Bearer ")) {
-      const decodedToken = jwt.verify(
-        auth.substring(7),
-        process.env.JWT_SECRET
-      );
+// setup is now within a function
+const start = async () => {
+  const app = express();
+  const httpServer = http.createServer(app);
 
-      const currentUser = await User.findById(decodedToken.id).populate(
-        "friends"
-      );
-      return { currentUser };
-    }
-  },
-}).then(({ url }) => {
-  console.log(`Server ready at ${url}`);
-});
+  const server = new ApolloServer({
+    schema: makeExecutableSchema({ typeDefs, resolvers }),
+    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+  });
+
+  await server.start();
+
+  app.use(
+    "/",
+    cors(),
+    express.json(),
+    expressMiddleware(server, {
+      context: async ({ req }) => {
+        const auth = req ? req.headers.authorization : null;
+        if (auth && auth.startsWith("Bearer ")) {
+          const decodedToken = jwt.verify(
+            auth.substring(7),
+            process.env.JWT_SECRET
+          );
+          const currentUser = await User.findById(decodedToken.id).populate(
+            "friends"
+          );
+          return { currentUser };
+        }
+      },
+    })
+  );
+
+  const PORT = 4000;
+
+  httpServer.listen(PORT, () =>
+    console.log(`Server is now running on http://localhost:${PORT}`)
+  );
+};
+
+start();
+
+// // Apollo Server
+// const server = new ApolloServer({
+//   typeDefs,
+//   resolvers,
+// });
+
+// // start Apollo Server
+// startStandaloneServer(server, {
+//   listen: { port: 4000 },
+//   context: async ({ req, res }) => {
+//     const auth = req ? req.headers.authorization : null;
+//     if (auth && auth.startsWith("Bearer ")) {
+//       const decodedToken = jwt.verify(
+//         auth.substring(7),
+//         process.env.JWT_SECRET
+//       );
+
+//       const currentUser = await User.findById(decodedToken.id).populate(
+//         "friends"
+//       );
+//       return { currentUser };
+//     }
+//   },
+// }).then(({ url }) => {
+//   console.log(`Server ready at ${url}`);
+// });
