@@ -21,6 +21,10 @@ const typeDefs = `
     id: ID!
   }
 
+  type Subscription {
+    personAdded: Person!
+  }    
+
   enum YesNo {
     YES
     NO
