@@ -38,6 +38,9 @@ mongoose
   .then(() => console.log("Connected to MongoDB"))
   .catch((e) => console.log("error connection to MongoDB: ", e));
 
+// debug for mongoose
+mongoose.set("debug", true);
+
 // setup is now within a function
 const start = async () => {
   const app = express();
